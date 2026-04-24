@@ -16,9 +16,13 @@
  */
 package org.apache.kafka.tools;
 
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Utils;
+import org.apache.kafka.tools.filter.TopicPartitionFilter;
 
 import java.io.PrintStream;
 import java.util.Arrays;
@@ -27,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class ToolsUtils {
@@ -153,5 +158,21 @@ public class ToolsUtils {
         for (T t : toRemove)
             res.remove(t);
         return res;
+    }
+
+    public static List<TopicPartition> listPartitionInfos(
+            Admin client,
+            TopicPartitionFilter topicPartitionFilter,
+            boolean excludeInternalTopics
+    ) throws ExecutionException, InterruptedException {
+        ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(!excludeInternalTopics);
+        Set<String> topics = client.listTopics(listTopicsOptions).names().get();
+        Set<String> filteredTopics = topics.stream().filter(topicPartitionFilter::isTopicAllowed).collect(Collectors.toSet());
+
+        return client.describeTopics(filteredTopics).allTopicNames().get().entrySet().stream().flatMap(
+                topic -> topic.getValue().partitions().stream().map(
+                        tp -> new TopicPartition(topic.getKey(), tp.partition())
+                ).filter(topicPartitionFilter::isTopicPartitionAllowed)
+        ).collect(Collectors.toList());
     }
 }

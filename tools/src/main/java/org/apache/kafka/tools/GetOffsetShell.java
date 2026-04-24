@@ -362,15 +362,7 @@ public class GetOffsetShell {
             TopicPartitionFilter topicPartitionFilter,
             boolean excludeInternalTopics
     ) throws ExecutionException, InterruptedException {
-        ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(!excludeInternalTopics);
-        Set<String> topics = client.listTopics(listTopicsOptions).names().get();
-        Set<String> filteredTopics = topics.stream().filter(topicPartitionFilter::isTopicAllowed).collect(Collectors.toSet());
-
-        return client.describeTopics(filteredTopics).allTopicNames().get().entrySet().stream().flatMap(
-                topic -> topic.getValue().partitions().stream().map(
-                        tp -> new TopicPartition(topic.getKey(), tp.partition())
-                ).filter(topicPartitionFilter::isTopicPartitionAllowed)
-        ).collect(Collectors.toList());
+        return ToolsUtils.listPartitionInfos(client, topicPartitionFilter, excludeInternalTopics);
     }
 
     private TopicPartitionFilter parseRuleSpec(String ruleSpec) throws TerseException, RuntimeException {
